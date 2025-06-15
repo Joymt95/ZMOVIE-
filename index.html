@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MovieFlix Pro</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        :root {
+            --netflix-red: #e50914;
+            --dark-bg: #141414;
+            --light-text: #f4f4f4;
+            --gray-text: #808080;
+            --card-bg: #2d2d2d;
+            --gradient: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.8) 100%);
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: var(--light-text);
+            height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Improved Loading Screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--dark-bg);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+        }
+
+        .theater-curtain {
+            position: relative;
+            width: 300px;
+            height: 200px;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .curtain {
+            position: absolute;
+            top: 0;
+            width: 50%;
+            height: 100%;
+            background: var(--netflix-red);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            transition: transform 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .curtain-left {
+            left: 0;
+            transform: translateX(-100%);
+        }
+
+        .curtain-right {
+            right: 0;
+            transform: translateX(100%);
+        }
+
+        .loading-screen.active .curtain-left {
+            transform: translateX(0);
+        }
+
+        .loading-screen.active .curtain-right {
+            transform: translateX(0);
+        }
+
+        .logo {
+            font-size: 3rem;
+            font-weight: bold;
+            color: var(--netflix-red);
+            margin-bottom: 20px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 1s;
+            text-shadow: 0 0 10px rgba(229, 9, 20, 0.7);
+        }
+
+        .loading-screen.active .logo {
+            opacity: 1;
+        }
+
+        .loading-text {
+            color: var(--light-text);
+            font-size: 1.2rem;
+            opacity: 0;
+            transition: opacity 1s;
+        }
+
+        .loading-screen.active .loading-text {
+            opacity: 1;
+        }
+
+        .loading-progress {
+            width: 200px;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+
+        .loading-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--netflix-red);
+            transition: width 3s ease;
+        }
+
+        /* Shimmer effect for movie posters */
+        .shimmer-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #2a2a2a;
+            border-radius: 8px;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .shimmer {
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 255, 255, 0.1),
+                transparent
+            );
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+            100% {
+                transform: translateX(200%);
+            }
+        }
+
+        /* Main App */
+        .app-container {
+            display: none;
+            height: 100%;
+        }
+
+        /* Header */
+        .app-header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: var(--gradient);
+            z-index: 100;
+        }
+
+        .app-logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--netflix-red);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: var(--light-text);
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .icon-btn:hover {
+            transform: scale(1.1);
+        }
+
+        /* Movie Sections */
+        .movie-section {
+            padding: 20px;
+            margin-top: 60px;
+        }
+
+        .section-title {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .movies-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .movie-card {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 2/3;
+            transform: perspective(1000px) rotateX(0deg) rotateY(0deg);
+            transform-style: preserve-3d;
+            transition: transform 0.5s ease, box-shadow 0.5s ease;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            cursor: pointer;
+            background: var(--card-bg);
+        }
+
+        .movie-card:hover {
+            transform: perspective(1000px) rotateX(5deg) rotateY(5deg) translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+        }
+
+        .movie-poster {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s;
+            z-index: 2;
+        }
+
+        .movie-card:hover .movie-poster {
+            transform: scale(1.05);
+        }
+
+        .movie-border {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 3px solid;
+            border-radius: 8px;
+            pointer-events: none;
+            transition: all 0.5s;
+            z-index: 3;
+        }
+
+        .movie-card:hover .movie-border {
+            border-width: 5px;
+        }
+
+        /* Movie Details */
+        .movie-details {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--dark-bg);
+            z-index: 200;
+            padding: 20px;
+            overflow-y: auto;
+            display: none;
+            transform: translateY(100%);
+            transition: transform 0.5s ease;
+        }
+
+        .movie-details.active {
+            transform: translateY(0);
+        }
+
+        .details-header {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .details-poster-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .details-poster {
+            width: 200px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 3px solid var(--netflix-red);
+        }
+
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.7);
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 10;
+            transition: all 0.3s;
+        }
+
+        .back-btn:hover {
+            background: var(--netflix-red);
+            transform: scale(1.1);
+        }
+
+        .details-content {
+            padding: 0 10px;
+            text-align: center;
+        }
+
+        .details-title {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            animation: fadeIn 1s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .movie-meta {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            font-size: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .rating {
+            color: gold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .play-btn-container {
+            margin: 25px 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .play-btn {
+            background: var(--netflix-red);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 5px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(229, 9, 20, 0.4);
+        }
+
+        .play-btn:hover {
+            background: #f40612;
+            transform: scale(1.05);
+            box-shadow: 0 7px 20px rgba(229, 9, 20, 0.6);
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h3 {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--netflix-red);
+            display: inline-block;
+        }
+
+        .cast-btn-container {
+            margin: 20px 0;
+        }
+
+        .cast-btn {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 2px solid var(--netflix-red);
+            padding: 12px 25px;
+            border-radius: 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 auto;
+        }
+
+        .cast-btn:hover {
+            background: rgba(229, 9, 20, 0.2);
+            transform: scale(1.05);
+        }
+        
+        /* Banner Ads Container */
+        .banner-ads {
+            width: 100%;
+            max-width: 728px;
+            margin: 20px auto;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 90px;
+        }
+        
+        .ad-label {
+            position: absolute;
+            top: -10px;
+            right: 15px;
+            background: var(--netflix-red);
+            color: white;
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        
+        .ad-container {
+            position: relative;
+            width: 100%;
+            text-align: center;
+        }
+
+        /* Cast Bubble Pop */
+        .cast-bubble {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 400;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .bubble-content {
+            background: var(--dark-bg);
+            border-radius: 20px;
+            padding: 25px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            border: 2px solid var(--netflix-red);
+            box-shadow: 0 0 30px rgba(229, 9, 20, 0.5);
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .bubble-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .bubble-title {
+            font-size: 1.8rem;
+            color: var(--netflix-red);
+        }
+
+        .close-bubble {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.8rem;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .close-bubble:hover {
+            transform: rotate(90deg);
+            color: var(--netflix-red);
+        }
+
+        .cast-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 15px;
+        }
+
+        .cast-item {
+            text-align: center;
+        }
+
+        .cast-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 8px;
+            border: 2px solid var(--netflix-red);
+            transition: transform 0.3s;
+        }
+
+        .cast-item:hover .cast-img {
+            transform: scale(1.1);
+        }
+
+        .cast-name {
+            font-size: 0.85rem;
+            line-height: 1.3;
+        }
+
+        /* Movie Player */
+        .movie-player {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: black;
+            z-index: 300;
+            display: none;
+        }
+
+        .player-header {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .player-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .player-close:hover {
+            transform: scale(1.2);
+            color: var(--netflix-red);
+        }
+
+        .video-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        video {
+            width: 100%;
+            max-height: 100%;
+        }
+        
+        /* Ad Player */
+        .ad-player {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: black;
+            z-index: 350;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .ad-container-full {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        
+        .ad-countdown {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid white;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 10;
+        }
+        
+        .ad-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        .ad-skip-btn {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: none;
+        }
+        
+        .ad-skip-btn:hover {
+            background: rgba(229, 9, 20, 0.8);
+        }
+
+        /* Responsive Design */
+        @media (min-width: 768px) {
+            .movies-container {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .movies-container {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Improved Loading Screen -->
+    <div class="loading-screen active" id="loadingScreen">
+        <div class="theater-curtain">
+            <div class="curtain curtain-left"></div>
+            <div class="curtain curtain-right"></div>
+        </div>
+        <div class="logo">MovieFlix Pro</div>
+        <div class="loading-text">Loading the cinematic experience...</div>
+        <div class="loading-progress">
+            <div class="loading-progress-bar" id="progressBar"></div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="app-container" id="appContainer">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="app-logo">
+                <i class="fas fa-film"></i>
+                MovieFlix
+            </div>
+            <div class="header-actions">
+                <button class="icon-btn"><i class="fas fa-search"></i></button>
+                <button class="icon-btn"><i class="fas fa-user"></i></button>
+            </div>
+        </header>
+
+        <!-- Movie Sections -->
+        <section class="movie-section">
+            <h2 class="section-title"><i class="fas fa-fire"></i> Popular Now</h2>
+            <div class="movies-container" id="popularMovies">
+                <!-- Movie cards will be dynamically inserted here -->
+            </div>
+        </section>
+
+        <section class="movie-section">
+            <h2 class="section-title"><i class="fas fa-star"></i> Top Rated</h2>
+            <div class="movies-container" id="topRatedMovies">
+                <!-- Movie cards will be dynamically inserted here -->
+            </div>
+        </section>
+
+        <section class="movie-section">
+            <h2 class="section-title"><i class="fas fa-clock"></i> Recently Added</h2>
+            <div class="movies-container" id="recentMovies">
+                <!-- Movie cards will be dynamically inserted here -->
+            </div>
+        </section>
+
+        <!-- Movie Details -->
+        <div class="movie-details" id="movieDetails">
+            <div class="details-header">
+                <button class="back-btn" id="detailsBackBtn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+            </div>
+            
+            <div class="details-poster-container">
+                <img src="" alt="Movie Poster" class="details-poster" id="detailsPoster">
+            </div>
+            
+            <div class="details-content">
+                <h2 class="details-title" id="detailsTitle"></h2>
+                <div class="movie-meta">
+                    <span class="rating" id="detailsRating"></span>
+                    <span id="detailsLanguage"></span>
+                    <span id="detailsYear"></span>
+                </div>
+                
+                <div class="play-btn-container">
+                    <button class="play-btn" id="playMovieBtn">
+                        <i class="fas fa-play"></i>
+                        Play Movie
+                    </button>
+                </div>
+                
+                <div class="cast-btn-container">
+                    <button class="cast-btn" id="viewCastBtn">
+                        <i class="fas fa-users"></i>
+                        View Top Billed Cast
+                    </button>
+                </div>
+                
+                <!-- Banner Ads Container -->
+                <div class="banner-ads">
+                    <div class="ad-container">
+                        <span class="ad-label">ADVERTISEMENT</span>
+                        <script type="text/javascript">
+                            atOptions = {
+                                'key' : 'bf05329685d747fc0effde73a8788460',
+                                'format' : 'iframe',
+                                'height' : 90,
+                                'width' : 728,
+                                'params' : {}
+                            };
+                        </script>
+                        <script type="text/javascript" src="//www.highperformanceformat.com/bf05329685d747fc0effde73a8788460/invoke.js"></script>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cast Bubble Pop -->
+        <div class="cast-bubble" id="castBubble">
+            <div class="bubble-content">
+                <div class="bubble-header">
+                    <h2 class="bubble-title">Top Billed Cast</h2>
+                    <button class="close-bubble" id="closeBubble">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="cast-grid" id="castGrid">
+                    <!-- Cast items will be dynamically inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Movie Player -->
+        <div class="movie-player" id="moviePlayer">
+            <div class="player-header">
+                <div class="player-title" id="playerTitle"></div>
+                <button class="player-close" id="playerClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="video-container">
+                <video id="movieVideo" controls>
+                    <source src="" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+        </div>
+        
+        <!-- Ad Player -->
+        <div class="ad-player" id="adPlayer">
+            <div class="ad-container-full">
+                <div class="ad-countdown" id="adCountdown">10</div>
+                <iframe src="" class="ad-frame" id="adFrame"></iframe>
+                <button class="ad-skip-btn" id="adSkipBtn">Skip Ad</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCOS6ymYzKv6ZOaIY6o2-VavzzYrWnGpuA",
+            authDomain: "movie-88327.firebaseapp.com",
+            projectId: "movie-88327",
+            storageBucket: "movie-88327.appspot.com",
+            messagingSenderId: "858683215951",
+            appId: "1:858683215951:web:cd05ad0896c84e5ee29a3a",
+            measurementId: "G-6C85QNC27S"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const moviesRef = database.ref('MT');
+
+        // DOM elements
+        const loadingScreen = document.getElementById('loadingScreen');
+        const progressBar = document.getElementById('progressBar');
+        const appContainer = document.getElementById('appContainer');
+        const popularMovies = document.getElementById('popularMovies');
+        const topRatedMovies = document.getElementById('topRatedMovies');
+        const recentMovies = document.getElementById('recentMovies');
+        const movieDetails = document.getElementById('movieDetails');
+        const detailsPoster = document.getElementById('detailsPoster');
+        const detailsTitle = document.getElementById('detailsTitle');
+        const detailsRating = document.getElementById('detailsRating');
+        const detailsYear = document.getElementById('detailsYear');
+        const detailsLanguage = document.getElementById('detailsLanguage');
+        const viewCastBtn = document.getElementById('viewCastBtn');
+        const castBubble = document.getElementById('castBubble');
+        const castGrid = document.getElementById('castGrid');
+        const closeBubble = document.getElementById('closeBubble');
+        const playMovieBtn = document.getElementById('playMovieBtn');
+        const moviePlayer = document.getElementById('moviePlayer');
+        const movieVideo = document.getElementById('movieVideo');
+        const playerClose = document.getElementById('playerClose');
+        const detailsBackBtn = document.getElementById('detailsBackBtn');
+        const playerTitle = document.getElementById('playerTitle');
+        
+        // Ad elements
+        const adPlayer = document.getElementById('adPlayer');
+        const adFrame = document.getElementById('adFrame');
+        const adCountdown = document.getElementById('adCountdown');
+        const adSkipBtn = document.getElementById('adSkipBtn');
+
+        // Colors for movie borders
+        const borderColors = [
+            '#e50914', '#00a8ff', '#9c27b0', '#ff9800', 
+            '#4caf50', '#f44336', '#2196f3', '#ff5722'
+        ];
+
+        // Current movie data
+        let moviesData = [];
+        let currentMovie = null;
+        let adCountdownInterval = null;
+
+        // Show loading screen initially
+        loadingScreen.classList.add('active');
+        
+        // Simulate progress bar
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += 10;
+            progressBar.style.width = `${progress}%`;
+            
+            if (progress >= 100) {
+                clearInterval(progressInterval);
+                // Hide loading screen
+                loadingScreen.style.opacity = '0';
+                loadingScreen.style.visibility = 'hidden';
+                
+                // Show app
+                appContainer.style.display = 'block';
+                
+                // Fetch movies from Firebase
+                fetchMovies();
+            }
+        }, 300);
+
+        // Fetch movies from Firebase
+        function fetchMovies() {
+            moviesRef.on('value', (snapshot) => {
+                moviesData = [];
+                const data = snapshot.val();
+                
+                if (data) {
+                    Object.keys(data).forEach(key => {
+                        moviesData.push(data[key]);
+                    });
+                    
+                    renderMovies();
+                } else {
+                    // Show placeholder if no movies
+                    popularMovies.innerHTML = '<p class="no-movies">No movies found. Add some movies to get started.</p>';
+                    topRatedMovies.innerHTML = '';
+                    recentMovies.innerHTML = '';
+                }
+            });
+        }
+
+        // Render movies to the UI
+        function renderMovies() {
+            popularMovies.innerHTML = '';
+            topRatedMovies.innerHTML = '';
+            recentMovies.innerHTML = '';
+            
+            // Sort movies by rating (descending)
+            const topRated = [...moviesData].sort((a, b) => b.vote_average - a.vote_average).slice(0, 8);
+            
+            // Sort movies by release date (descending)
+            const recent = [...moviesData].sort((a, b) => 
+                new Date(b.release_date) - new Date(a.release_date)
+            ).slice(0, 8);
+            
+            // Get popular movies (first 8)
+            const popular = moviesData.slice(0, 8);
+            
+            // Render popular movies
+            popular.forEach(movie => {
+                popularMovies.appendChild(createMovieCard(movie));
+            });
+            
+            // Render top rated movies
+            topRated.forEach(movie => {
+                topRatedMovies.appendChild(createMovieCard(movie));
+            });
+            
+            // Render recent movies
+            recent.forEach(movie => {
+                recentMovies.appendChild(createMovieCard(movie));
+            });
+            
+            // Add 8D effect to movie cards
+            add8DEffect();
+        }
+
+        // Create movie card element with shimmer effect
+        function createMovieCard(movie) {
+            const card = document.createElement('div');
+            card.className = 'movie-card';
+            card.dataset.id = movie.id;
+            
+            // Random border color
+            const randomColor = borderColors[Math.floor(Math.random() * borderColors.length)];
+            
+            // Create shimmer container
+            const shimmerContainer = document.createElement('div');
+            shimmerContainer.className = 'shimmer-container';
+            
+            const shimmer = document.createElement('div');
+            shimmer.className = 'shimmer';
+            shimmerContainer.appendChild(shimmer);
+            
+            // Create poster image
+            const poster = document.createElement('img');
+            poster.className = 'movie-poster';
+            poster.alt = movie.title;
+            poster.src = `https://image.tmdb.org/t/p/w500${movie.poster_path}`;
+            
+            // Handle image load
+            poster.onload = function() {
+                shimmerContainer.style.display = 'none';
+            };
+            
+            // Handle image error
+            poster.onerror = function() {
+                shimmerContainer.style.display = 'none';
+                this.src = 'https://via.placeholder.com/300x450?text=No+Image';
+            };
+            
+            // Create border
+            const border = document.createElement('div');
+            border.className = 'movie-border';
+            border.style.borderColor = randomColor;
+            
+            // Append elements to card
+            card.appendChild(shimmerContainer);
+            card.appendChild(poster);
+            card.appendChild(border);
+            
+            // Add click event
+            card.addEventListener('click', () => showMovieDetails(movie));
+            
+            return card;
+        }
+
+        // Add 8D effect to movie cards
+        function add8DEffect() {
+            const movieCards = document.querySelectorAll('.movie-card');
+            
+            movieCards.forEach(card => {
+                card.addEventListener('mousemove', (e) => {
+                    const cardRect = card.getBoundingClientRect();
+                    const x = e.clientX - cardRect.left;
+                    const y = e.clientY - cardRect.top;
+                    
+                    const centerX = cardRect.width / 2;
+                    const centerY = cardRect.height / 2;
+                    
+                    const rotateY = (x - centerX) / 25;
+                    const rotateX = (centerY - y) / 25;
+                    
+                    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-5px)`;
+                });
+                
+                card.addEventListener('mouseleave', () => {
+                    card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) translateY(0)';
+                });
+            });
+        }
+
+        // Show movie details with zoom effect
+        function showMovieDetails(movie) {
+            currentMovie = movie;
+            
+            // Get the clicked card
+            const clickedCard = document.querySelector(`.movie-card[data-id="${movie.id}"]`);
+            
+            // Create a clone of the poster for the zoom effect
+            const clone = clickedCard.querySelector('.movie-poster').cloneNode(true);
+            clone.style.position = 'fixed';
+            clone.style.top = clickedCard.getBoundingClientRect().top + 'px';
+            clone.style.left = clickedCard.getBoundingClientRect().left + 'px';
+            clone.style.width = clickedCard.getBoundingClientRect().width + 'px';
+            clone.style.height = clickedCard.getBoundingClientRect().height + 'px';
+            clone.style.zIndex = '300';
+            clone.style.transition = 'all 0.5s ease';
+            clone.style.borderRadius = '8px';
+            document.body.appendChild(clone);
+            
+            // Animate to center
+            setTimeout(() => {
+                clone.style.top = '50%';
+                clone.style.left = '50%';
+                clone.style.transform = 'translate(-50%, -50%) scale(1.5)';
+                clone.style.opacity = '0.7';
+            }, 10);
+            
+            // Set movie details
+            detailsPoster.src = `https://image.tmdb.org/t/p/w500${movie.poster_path}`;
+            detailsPoster.onerror = function() {
+                this.src = 'https://via.placeholder.com/300x450?text=No+Image';
+            };
+            detailsTitle.textContent = movie.title;
+            detailsRating.innerHTML = `<i class="fas fa-star"></i> ${movie.vote_average.toFixed(1)}/10`;
+            detailsYear.textContent = new Date(movie.release_date).getFullYear();
+            detailsLanguage.textContent = movie.original_language.toUpperCase();
+            
+            // Remove clone and show details
+            setTimeout(() => {
+                document.body.removeChild(clone);
+                movieDetails.style.display = 'block';
+                setTimeout(() => {
+                    movieDetails.classList.add('active');
+                }, 10);
+            }, 500);
+        }
+
+        // View cast button handler
+        viewCastBtn.addEventListener('click', () => {
+            if (currentMovie && currentMovie.cast) {
+                castGrid.innerHTML = '';
+                
+                currentMovie.cast.slice(0, 10).forEach(person => {
+                    const castItem = document.createElement('div');
+                    castItem.className = 'cast-item';
+                    castItem.innerHTML = `
+                        <img src="${person.profile_path ? `https://image.tmdb.org/t/p/w200${person.profile_path}` : 'https://via.placeholder.com/100x100?text=No+Image'}" 
+                             alt="${person.name}" 
+                             class="cast-img">
+                        <div class="cast-name">${person.name}</div>
+                    `;
+                    castGrid.appendChild(castItem);
+                });
+                
+                castBubble.style.display = 'flex';
+            }
+        });
+
+        // Close cast bubble
+        closeBubble.addEventListener('click', () => {
+            castBubble.style.display = 'none';
+        });
+
+        // Play movie with ad
+        playMovieBtn.addEventListener('click', () => {
+            if (currentMovie && currentMovie.link) {
+                // Set ad URL
+                const adUrl = "https://www.profitableratecpm.com/id78mr691?key=962e9e67496edd6bbbbad31397ad40a2";
+                adFrame.src = adUrl;
+                
+                // Show ad player
+                adPlayer.style.display = 'flex';
+                
+                // Start countdown
+                let count = 10;
+                adCountdown.textContent = count;
+                adSkipBtn.style.display = 'none'; // Hide skip button initially
+                
+                // Show skip button after 3 seconds
+                setTimeout(() => {
+                    adSkipBtn.style.display = 'block';
+                }, 3000);
+                
+                // Countdown timer
+                adCountdownInterval = setInterval(() => {
+                    count--;
+                    adCountdown.textContent = count;
+                    
+                    if (count <= 0) {
+                        clearInterval(adCountdownInterval);
+                        // Hide ad player
+                        adPlayer.style.display = 'none';
+                        // Play the movie
+                        playMovie();
+                    }
+                }, 1000);
+            } else {
+                alert('Movie link not available');
+            }
+        });
+
+        // Function to play movie after ad
+        function playMovie() {
+            if (currentMovie && currentMovie.link) {
+                movieVideo.src = currentMovie.link;
+                playerTitle.textContent = currentMovie.title;
+                moviePlayer.style.display = 'block';
+                movieVideo.play();
+            }
+        }
+
+        // Skip ad button handler
+        adSkipBtn.addEventListener('click', () => {
+            clearInterval(adCountdownInterval);
+            adPlayer.style.display = 'none';
+            playMovie();
+        });
+
+        // Close player
+        playerClose.addEventListener('click', () => {
+            movieVideo.pause();
+            moviePlayer.style.display = 'none';
+        });
+
+        // Back button in details
+        detailsBackBtn.addEventListener('click', () => {
+            movieDetails.classList.remove('active');
+            setTimeout(() => {
+                movieDetails.style.display = 'none';
+            }, 500);
+            
+            // If ad is playing, stop it
+            if (adPlayer.style.display === 'flex') {
+                clearInterval(adCountdownInterval);
+                adPlayer.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
